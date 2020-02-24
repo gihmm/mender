@@ -538,11 +538,29 @@ func getMenderDaemonPID(cmd *exec.Cmd) (string, error) {
 	return strings.Trim(buf.String(), "MainPID=\n"), nil
 }
 
+func getMenderDaemonPIDPidof() (string, error) {
+	cmd := exec.Command("/bin/pidof", "-s", "mender")
+	buf := bytes.NewBuffer(nil)
+	cmd.Stdout = buf
+	err := cmd.Run()
+	if err != nil {
+		return "", errors.New("getMenderDaemonPIDPidof: Failed to run pidof: " + err.Error())
+	}
+	if buf.Len() == 0 {
+		return "", errors.New("could not find the PID of the mender daemon")
+	}
+	return strings.Trim(buf.String(), "\n"), nil
+}
+
 // updateCheck sends a SIGUSR{1,2} signal to the running mender daemon.
 func updateCheck(cmdKill, cmdGetPID *exec.Cmd) error {
 	pid, err := getMenderDaemonPID(cmdGetPID)
 	if err != nil {
-		return errors.Wrap(err, "failed to force updateCheck: ")
+		//try pidof
+		pid, err = getMenderDaemonPIDPidof()
+		if err != nil {
+			return errors.Wrap(err, "failed to force updateCheck: ")
+		}
 	}
 	cmdKill.Args = append(cmdKill.Args, pid)
 	err = cmdKill.Run()
